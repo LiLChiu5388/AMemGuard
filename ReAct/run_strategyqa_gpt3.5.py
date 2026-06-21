@@ -283,8 +283,9 @@ if directory:
     os.makedirs(directory, exist_ok=True)
 
 
+_max_examples = int(os.getenv("MAX_EXAMPLES", "0")) or len(env)
 with open(save_file_name,"a") as output_file:
-    for i in tqdm(range(len(env))):
+    for i in tqdm(range(min(len(env), _max_examples))):
         question = env.reset(idx=i)
         gold_answer = env.data[i][1]
         num_instance += 1
