@@ -436,8 +436,9 @@ def check_consistency(query, memories, selected_indexes, mode="example", knn=Non
     compatibility; the consensus strategy is selected by `method` ('llm' default, 'clustering').
     """
     if method is None:
-        # Default to the paper's main method (Instantiation 1, two-stage consensus).
-        method = os.getenv("AMEMGUARD_METHOD", "consensus")
+        # Default to 'llm' == the paper's actual judgment prompt (Figure 10). The
+        # 'consensus' two-stage variant (from the Appendix A.1 text) is kept as an option.
+        method = os.getenv("AMEMGUARD_METHOD", "llm")
     checker = _get_default_checker()
     return checker.check(query, memories, list(selected_indexes), method=method)
 
