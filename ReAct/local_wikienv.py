@@ -17,8 +17,8 @@ import random
 import openai
 import re
 
-from auditor import audit_and_sanitize_item
-from perplexity import audit_memory_ppl
+# auditor (ro) and perplexity (ppl) load an 8B LLM at import time; import them
+# lazily inside their audit_method branches so the default / A-MemGuard paths stay light.
 from classifier import RandECDetector
 from consistency import check_consistency
 
@@ -345,6 +345,7 @@ class WikiEnv(gym.Env):
       
       ################ ppl
       if self.audit_method == "ppl":
+        from perplexity import audit_memory_ppl
         survived_retrieve_knowledges = audit_memory_ppl(retrieve_knowledges)
       ################ distil
       if self.audit_method == "distil":
@@ -360,6 +361,7 @@ class WikiEnv(gym.Env):
 
       ################ ro
       if self.audit_method == "ro":
+        from auditor import audit_and_sanitize_item
         retrieve_knowledge = audit_and_sanitize_item("retrieve_knowledge", retrieve_knowledge)
       ################
 
