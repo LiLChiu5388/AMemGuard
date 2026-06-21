@@ -13,7 +13,7 @@ import random
 import openai
 import re
 
-from auditor_token import audit_and_sanitize_item
+from auditor import audit_and_sanitize_item
 from perplexity import audit_memory_ppl
 from classifier import RandECDetector
 from consistency import check_consistency
@@ -60,11 +60,11 @@ class WikiEnv(gym.Env):
 
     # load retriever
     if "dpr" in embedder_name:
-      self.embedding_tokenizer = AutoTokenizer.from_pretrained("/dpr-ctx_encoder-single-nq-base")
-      self.embedding_model = DPRContextEncoder.from_pretrained("dpr-ctx_encoder-single-nq-base").to("cuda")
+      self.embedding_tokenizer = AutoTokenizer.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
+      self.embedding_model = DPRContextEncoder.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base").to("cuda")
     elif "realm" in embedder_name and "orqa" not in embedder_name:
-      self.embedding_tokenizer = AutoTokenizer.from_pretrained("realm-cc-news-pretrained-embedder")
-      self.embedding_model = RealmEmbedder.from_pretrained("realm-cc-news-pretrained-embedder").realm.to("cuda")
+      self.embedding_tokenizer = AutoTokenizer.from_pretrained("google/realm-cc-news-pretrained-embedder")
+      self.embedding_model = RealmEmbedder.from_pretrained("google/realm-cc-news-pretrained-embedder").realm.to("cuda")
     elif "ance" in embedder_name:
       self.embedding_tokenizer = AutoTokenizer.from_pretrained("castorini/ance-dpr-question-multi")
       self.embedding_model = DPRContextEncoder.from_pretrained("castorini/ance-dpr-question-multi").to("cuda")

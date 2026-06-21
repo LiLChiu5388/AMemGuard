@@ -358,6 +358,43 @@ def build_provider(backend: str, model: str,
     raise ValueError(f"Unknown backend: {backend!r}. Choose from 'hf', 'openai', 'vllm'.")
 
 
+# ---------------------------------------------------------------------------
+# Compatibility shim restoring the module-level `check_consistency` entry point.
+# Both ReAct/local_wikienv.py and EhrAgent/ehragent/medagent.py import and call
+# `check_consistency(...)`, but no `def check_consistency` exists in any commit of
+# this repo (verified via `git log -S`): the "add model provider" refactor left
+# only the `ConsistencyChecker` class. This thin adapter rebuilds the original
+# entry point on top of ConsistencyChecker, caching the provider so we do NOT
+# reload the model / SentenceTransformer on every retrieval call. Backend / model
+# / consensus method are overridable via env vars for ablation.
+# ---------------------------------------------------------------------------
+_DEFAULT_CHECKER = None
+
+
+def _get_default_checker():
+    global _DEFAULT_CHECKER
+    if _DEFAULT_CHECKER is None:
+        backend = os.getenv("AMEMGUARD_BACKEND", "openai")
+        model = os.getenv("AMEMGUARD_MODEL", "gpt-4o-mini")
+        provider = build_provider(backend, model, api_key=os.getenv("OPENAI_API_KEY"))
+        _DEFAULT_CHECKER = ConsistencyChecker(model_provider=provider)
+    return _DEFAULT_CHECKER
+
+
+def check_consistency(query, memories, selected_indexes, mode="example", knn=None, method=None):
+    """Module-level entry point expected by the agent code.
+
+    Returns {'consistent_memories': [...], 'inconsistent_memories': [...], 'token_usage': {...}},
+    where each memory item has keys 'memory', 'reasoning_chain', 'index' -- exactly what
+    local_wikienv.py and medagent.py consume. `mode`/`knn` are accepted only for call-site
+    compatibility; the consensus strategy is selected by `method` ('llm' default, 'clustering').
+    """
+    if method is None:
+        method = os.getenv("AMEMGUARD_METHOD", "llm")
+    checker = _get_default_checker()
+    return checker.check(query, memories, list(selected_indexes), method=method)
+
+
 def print_results(result: Dict[str, Any], query: str):
     """Helper function to neatly print the results."""
     print("\n" + "="*50)

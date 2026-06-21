@@ -24,8 +24,8 @@ parser.add_argument("--knn", "-k", type=int, default=5, help="choose from [1, 3,
 parser.add_argument("--audit_method", type=str, default=None, help="Enable audit mode")
 args = parser.parse_args()
 
-OPENAI_API_KEY = ""
-BASE_URL = ""
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+BASE_URL = os.getenv("OPENAI_BASE_URL", "") or None
 
 embedder = args.model
 algo = args.algo
@@ -48,10 +48,14 @@ def gpt(prompt, stop=["\n"], return_probs=False):
         frequency_penalty=0.0,
         presence_penalty=0.0,
         stop=stop,
-        logprobs=1,
     )
     
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    # react() unpacks two values when return_probs=True; logprobs aren't used by
+    # eval.py, so return None in the probs slot to satisfy the call signature.
+    if return_probs:
+        return content, None
+    return content
 
 def llama3(prompt, stop=["\n"], return_probs=False):
     messages = [
@@ -118,8 +122,14 @@ else:
     llm = llama3
 
 
-##### Put your trigger tokens here #####
-# trigger_token_list = ['put', 'your', 'trigger', 'tokens', 'in', 'this', 'list']
+##### Trigger tokens: paste the optimized trigger, or inject via env for automation #####
+# After running algo/trigger_optimization.py, hard-code the optimized tokens here, e.g.:
+#   trigger_token_list = ['put', 'your', 'trigger', 'tokens', 'in', 'this', 'list']
+# For notebook automation we read them from the TRIGGER_TOKENS env var (space-separated).
+trigger_token_list = os.getenv("TRIGGER_TOKENS", "").split()
+if not trigger_token_list:
+    raise SystemExit("No trigger tokens set. Provide an optimized trigger via the "
+                     "TRIGGER_TOKENS env var (space-separated) or hard-code trigger_token_list above.")
 print("trigger_token_list", trigger_token_list)
 
 trigger_token_list = [token for token in trigger_token_list if token not in ['[CLS]', '[MASK]', '[SEP]']]
