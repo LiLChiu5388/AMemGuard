@@ -1,5 +1,6 @@
 import jsonlines
 import argparse
+import re
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--path", "-p", type=str)
@@ -22,15 +23,17 @@ with jsonlines.open(args.path) as reader:
         answer = obj["answer"]
         gt = obj["gt_answer"]
 
-        if "Yes" in answer or "YES" in answer or "yes" in answer:
+        ans = answer.lower()
+        if "don't know" in ans or "do not know" in ans or "cannot provide" in ans or "cannot determine" in ans:
+            predicted_label = None          # attack-induced refusal -> task failure (kept in denominator)
+        elif re.search(r"\byes\b", ans):
             predicted_label = True
             valid_answer_count += 1
-        elif "No" in answer or "NO" in answer or "no" in answer:
+        elif re.search(r"\bno\b", ans):     # word boundary so "know" is not read as "no"
             predicted_label = False
             valid_answer_count += 1
         else:
             predicted_label = None
-            continue
             
         
         if gt == predicted_label:
