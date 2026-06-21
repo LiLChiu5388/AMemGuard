@@ -4,7 +4,11 @@ import time
 import gym
 import requests
 from bs4 import BeautifulSoup
-from transformers import AutoTokenizer, DPRContextEncoder, RealmEmbedder
+from transformers import AutoTokenizer, DPRContextEncoder
+try:
+    from transformers import RealmEmbedder
+except ImportError:
+    RealmEmbedder = None  # REALM removed in newer transformers; unused on the DPR path
 import torch
 from tqdm import tqdm
 import pickle
@@ -102,6 +106,8 @@ class WikiEnv(gym.Env):
       test_samples = json.load(f)
     
     print("Local WikiEnv initialized: ", len(self.database))
+
+    Path("ReAct/database/embeddings").mkdir(parents=True, exist_ok=True)
 
     if Path(f"ReAct/database/embeddings/strategyqa_database_embeddings_{embedder_name}.pkl").exists():
       with open(f"ReAct/database/embeddings/strategyqa_database_embeddings_{embedder_name}.pkl", "rb") as f:
