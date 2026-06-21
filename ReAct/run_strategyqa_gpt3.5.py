@@ -244,8 +244,12 @@ def react(idx=None, prompt=sqa_react_prompt, to_print=False):
             action = action_llm_output
             
             react_probs.append(action_probs)
-            _, action = parse_thought_action(action, i)
+            _, parsed_action = parse_thought_action(action_llm_output, i)
+            if parsed_action:
+                action = parsed_action   # else keep raw output; step() extracts the xxx[...] pattern itself
 
+        if not action:
+            action = "finish[]"          # unparseable step -> finish gracefully instead of crashing
         obs, r, done, info = step(env, action[0].lower() + action[1:], current_context)
         obs = obs.replace('\\n', '')
 
