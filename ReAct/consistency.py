@@ -416,6 +416,7 @@ def build_provider(backend: str, model: str,
 # / consensus method are overridable via env vars for ablation.
 # ---------------------------------------------------------------------------
 _DEFAULT_CHECKER = None
+_CONSISTENCY_CACHE = {}   # (query, memories, method) -> result; exact because the judge runs at temperature=0
 
 
 def _get_default_checker():
@@ -440,8 +441,15 @@ def check_consistency(query, memories, selected_indexes, mode="example", knn=Non
         # Default to 'llm' == the paper's actual judgment prompt (Figure 10). The
         # 'consensus' two-stage variant (from the Appendix A.1 text) is kept as an option.
         method = os.getenv("AMEMGUARD_METHOD", "llm")
+    # Deterministic cache (judge runs at temperature=0): reuse identical (query, memories)
+    # consensus decisions to cut redundant API requests across repeated retrievals.
+    key = (query, tuple(memories), method)
+    if key in _CONSISTENCY_CACHE:
+        return _CONSISTENCY_CACHE[key]
     checker = _get_default_checker()
-    return checker.check(query, memories, list(selected_indexes), method=method)
+    result = checker.check(query, memories, list(selected_indexes), method=method)
+    _CONSISTENCY_CACHE[key] = result
+    return result
 
 
 def print_results(result: Dict[str, Any], query: str):
