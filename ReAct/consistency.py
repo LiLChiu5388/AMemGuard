@@ -94,11 +94,11 @@ class OpenAIModel(ModelProvider):
     """
     A model provider for OpenAI's API.
     """
-    def __init__(self, model_name: str = "gpt-4o-mini", api_key: str = None, max_workers: int = 5):
+    def __init__(self, model_name: str = "gpt-4o-mini", api_key: str = None, max_workers: int = 5, base_url: str = None):
         api_key_to_use = api_key or os.getenv("OPENAI_API_KEY")
         if not api_key_to_use:
             raise ValueError("OpenAI API key is required. Pass it as an argument or set the OPENAI_API_KEY environment variable.")
-        self.client = OpenAI(api_key=api_key_to_use)
+        self.client = OpenAI(api_key=api_key_to_use, base_url=base_url)  # base_url -> any OpenAI-compatible endpoint (e.g. a Llama host)
         self.model_name = model_name
         self.max_workers = max_workers
         print(f"OpenAI model provider initialized for model: {self.model_name}")
@@ -391,16 +391,16 @@ Output ONLY a JSON object: {{"consistent": true}} or {{"consistent": false}}."""
         }
 
 def build_provider(backend: str, model: str,
-                   base_url: str = "http://localhost:8000/v1",
+                   base_url: str = None,
                    api_key: str = None) -> ModelProvider:
     """Factory: construct a ModelProvider by backend name ('hf' | 'openai' | 'vllm')."""
     backend = backend.lower()
     if backend == "hf":
         return HuggingFaceModel(model_id=model)
     if backend == "openai":
-        return OpenAIModel(model_name=model, api_key=api_key)
+        return OpenAIModel(model_name=model, api_key=api_key, base_url=base_url)
     if backend == "vllm":
-        return VLLMModel(model_name=model, base_url=base_url,
+        return VLLMModel(model_name=model, base_url=base_url or "http://localhost:8000/v1",
                          api_key=api_key or "EMPTY")
     raise ValueError(f"Unknown backend: {backend!r}. Choose from 'hf', 'openai', 'vllm'.")
 
@@ -424,7 +424,9 @@ def _get_default_checker():
     if _DEFAULT_CHECKER is None:
         backend = os.getenv("AMEMGUARD_BACKEND", "openai")
         model = os.getenv("AMEMGUARD_MODEL", "gpt-4o-mini")
-        provider = build_provider(backend, model, api_key=os.getenv("OPENAI_API_KEY"))
+        base_url = os.getenv("AMEMGUARD_BASE_URL") or None   # e.g. https://api.together.xyz/v1 for a Llama judge
+        api_key = os.getenv("AMEMGUARD_API_KEY") or os.getenv("OPENAI_API_KEY")
+        provider = build_provider(backend, model, base_url=base_url, api_key=api_key)
         _DEFAULT_CHECKER = ConsistencyChecker(model_provider=provider)
     return _DEFAULT_CHECKER
 
