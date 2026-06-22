@@ -112,6 +112,7 @@ class OpenAIModel(ModelProvider):
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
+                temperature=0,   # deterministic judge -> reproducible consensus decisions
             )
             content = response.choices[0].message.content or ""
             usage = response.usage

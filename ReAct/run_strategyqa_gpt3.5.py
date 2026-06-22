@@ -27,6 +27,9 @@ args = parser.parse_args()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 BASE_URL = os.getenv("OPENAI_BASE_URL", "") or None
 
+import random
+random.seed(int(os.getenv("SEED", "0")))   # reproducibility of retrieval random.choice
+
 embedder = args.model
 algo = args.algo
 task_type = args.task_type
