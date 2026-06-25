@@ -108,22 +108,26 @@ class OpenAIModel(ModelProvider):
             {"role": "system", "content": "You are a helpful and precise assistant for logical analysis and text generation."},
             {"role": "user", "content": prompt}
         ]
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                temperature=0,   # deterministic judge -> reproducible consensus decisions
-            )
-            content = response.choices[0].message.content or ""
-            usage = response.usage
-            stats = {
-                "input_tokens": usage.prompt_tokens,
-                "output_tokens": usage.completion_tokens,
-            }
-            return content.strip(), stats
-        except Exception as e:
-            print(f"Error calling OpenAI API: {e}")
-            return f"Error: {e}", {"input_tokens": 0, "output_tokens": 0}
+        import time
+        for _attempt in range(6):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=0,   # deterministic judge -> reproducible consensus decisions
+                )
+                content = response.choices[0].message.content or ""
+                usage = response.usage
+                stats = {
+                    "input_tokens": usage.prompt_tokens,
+                    "output_tokens": usage.completion_tokens,
+                }
+                return content.strip(), stats
+            except Exception as e:
+                if _attempt == 5:
+                    print(f"Error calling judge API after retries: {e}")
+                    return f"Error: {e}", {"input_tokens": 0, "output_tokens": 0}
+                time.sleep(min(2 ** _attempt, 20))   # backoff on rate-limit / transient errors
 
     def generate_batch(self, prompts: List[str], token_stats: bool = False) -> Tuple[List[str], Dict[str, int]]:
         outputs = [""] * len(prompts)

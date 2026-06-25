@@ -26,6 +26,7 @@ args = parser.parse_args()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 BASE_URL = os.getenv("OPENAI_BASE_URL", "") or None
+AGENT_MODEL = os.getenv("AGENT_MODEL", "gpt-4o-mini")  # set this + OPENAI_BASE_URL to run the agent off-OpenAI (e.g. a Llama endpoint)
 
 import random
 random.seed(int(os.getenv("SEED", "0")))   # reproducibility of retrieval random.choice
@@ -43,16 +44,23 @@ def gpt(prompt, stop=["\n"], return_probs=False):
         base_url=BASE_URL,
     )
     msg = [{"role": "user", "content": prompt}]
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=msg,
-        max_tokens=128,
-        temperature=0,
-        frequency_penalty=0.0,
-        presence_penalty=0.0,
-        stop=stop,
-    )
-    
+    for _attempt in range(6):
+        try:
+            response = client.chat.completions.create(
+                model=AGENT_MODEL,
+                messages=msg,
+                max_tokens=128,
+                temperature=0,
+                frequency_penalty=0.0,
+                presence_penalty=0.0,
+                stop=stop,
+            )
+            break
+        except Exception as _e:
+            if _attempt == 5:
+                raise
+            time.sleep(min(2 ** _attempt, 20))   # backoff on rate-limit / transient errors
+
     content = response.choices[0].message.content
     # react() unpacks two values when return_probs=True; logprobs aren't used by
     # eval.py, so return None in the probs slot to satisfy the call signature.
