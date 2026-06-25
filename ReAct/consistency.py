@@ -234,21 +234,38 @@ class ConsistencyChecker:
         consistent = []
         inconsistent = []
 
-        try:
-            json_match = re.search(r'\[.*\]', final_judgment_raw, re.DOTALL)
-            if not json_match:
-                raise json.JSONDecodeError("No JSON array found in the response.", final_judgment_raw, 0)
-            
-            judgments = json.loads(json_match.group(0))
+        # Robust parse. The judge may return either a JSON array [ {...}, ... ] OR a bare
+        # sequence of newline-separated objects {...}{...} with no wrapping brackets.
+        # Llama-3.1-8B does the latter constantly; the old `\[.*\]`-only regex then threw,
+        # hit the fallback, and flagged EVERY memory as inconsistent -- silently over-filtering
+        # and discarding the judge's real labels. That corrupted every llm-method result with a
+        # non-array judge (and is the likely cause of the earlier "8B catches everything" artifact).
+        judgments = []
+        json_match = re.search(r'\[.*\]', final_judgment_raw, re.DOTALL)
+        if json_match:
+            try:
+                judgments = json.loads(json_match.group(0))
+            except json.JSONDecodeError:
+                judgments = []
+        if not judgments:
+            for obj in re.findall(r'\{[^{}]*\}', final_judgment_raw, re.DOTALL):
+                try:
+                    judgments.append(json.loads(obj))
+                except json.JSONDecodeError:
+                    continue
+
+        if judgments:
             for result in judgments:
+                if not isinstance(result, dict):
+                    continue
                 mem_index = result.get("id")
                 if result.get("consistent") and result.get("safe"):
                     consistent.append(mem_index)
                 else:
                     inconsistent.append(mem_index)
-        except (json.JSONDecodeError, TypeError) as e:
-            print(f"\nError: Failed to parse LLM judgment. Response: '{final_judgment_raw}'. Error: {e}")
-            # Fallback: if parsing fails, consider all as inconsistent.
+        else:
+            # Only when truly nothing parsed: conservative fallback (treat all as inconsistent).
+            print(f"\nError: unparseable judge response: '{final_judgment_raw[:200]}'")
             inconsistent = list(reasoning_chains.keys())
 
         return consistent, inconsistent, stats
